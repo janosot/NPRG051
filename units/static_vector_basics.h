@@ -1,6 +1,7 @@
 #include <iostream>
+#include <limits>
 
-#ifndef VECTOR__H
+#ifndef VECTOR_H
 #define VECTOR_H 
 
 template <int ... Values>
@@ -39,75 +40,121 @@ struct at<static_vector<Head, Tail ...>, Index>
 };
 
 // Create a vector with specific size and initial value
+template <std::size_t Size, int Value, int ... Values>
+struct fill_impl
+{
+    using type = push_back_t<typename fill_impl<Size - 1, Value, Values ...>::type, Value>;
+};
+
+template <int Value, int ... Values>
+struct fill_impl<0, Value, Values ...>
+{
+    using type = static_vector<Value, Values ...>;
+};
+
 template <std::size_t Size, int Value>
 struct fill
 {
-    using type = push_back_t<typename fill<Size - 1, Value>::type, Value>;
+    using type = typename fill_impl<Size, Value>::type;
 };
 
 template <std::size_t Size>
 struct fill<Size, 0>
 {
-    using type = static_vector<>;
+    using type = typename fill_impl<Size - 1, 0>::type;
 };
 
 template <std::size_t Size, int Value>
 using fill_t = typename fill<Size, Value>::type;
 
-// Join two vectors together
-template <typename FirstVector, typename SecondVector>
-struct join
+// Set a value at a specific index of the static_vector
+template <typename OldVector, typename NewVector, std::size_t Index, int Value>
+struct set_impl
 {};
 
-template <int ... FirstValues, int ... SecondValues>
-struct join<static_vector<FirstValues ...>, static_vector<SecondValues ...>>
+template <typename NewVector, std::size_t Index, int Value, int OldHead, int ... OldTail>
+struct set_impl<static_vector<OldHead, OldTail ...>, NewVector, Index, Value>
 {
-    using type = static_vector<FirstValues ..., SecondValues ...>;
+    using type = typename set_impl<static_vector<OldTail ...>, push_back_t<NewVector, OldHead>, Index - 1, Value>::type;
 };
 
-template <typename FirstVector, typename SecondVector>
-using join_t = typename join<FirstVector, SecondVector>::type;
+template <typename NewVector, int Value, int OldHead, int ... OldTail>
+struct set_impl<static_vector<OldHead, OldTail ...>, NewVector, 0, Value>
+{
+    using type = typename set_impl<static_vector<OldTail ...>, push_back_t<NewVector, Value>, std::numeric_limits<std::size_t>::max(), Value>::type;
+};
 
-// Set a value at a specific index of the static_vector
+template <typename NewVector, int Value, int OldHead, int ... OldTail>
+struct set_impl<static_vector<OldHead, OldTail ...>, NewVector, std::numeric_limits<std::size_t>::max(), Value>
+{
+    using type = typename set_impl<static_vector<OldTail ...>, push_back_t<NewVector, OldHead>, std::numeric_limits<std::size_t>::max(), Value>::type;
+};
+
+template <typename NewVector, int Value>
+struct set_impl<static_vector<>, NewVector, std::numeric_limits<std::size_t>::max(), Value>
+{
+    using type = NewVector;
+};
+
 template <typename Vector, std::size_t Index, int Value>
 struct set
-{};
-
-template <int Value, int ... Values, std::size_t Index>
-struct set<static_vector<Values ...>, Index, Value>
 {
-    using type = static_vector<Values ..., Value>;
+    using type = typename set_impl<Vector, static_vector<>, Index, Value>::type;
 };
 
 template <typename Vector, std::size_t Index, int Value>
 using set_t = typename set<Vector, Index, Value>::type;
 
 // Add two vectors
-template <typename Vector1, typename Vector2>
-struct add
+template <typename FirstVector, typename SecondVector, typename AddedVector>
+struct add_impl
 {};
 
-template <int ... Values1, int ... Values2>
-struct add<static_vector<Values1 ...>, static_vector<Values2 ...>>
+template <int FirstHead, int SecondHead, typename AddedVector>
+struct add_impl<static_vector<FirstHead>, static_vector<SecondHead>, AddedVector>
 {
-    using type = static_vector<Values1 ..., Values2 ...>;
+    using type = push_back_t<AddedVector, (FirstHead + SecondHead)>;
 };
 
-template <typename Vector1, typename Vector2>
-using add_t = typename add<Vector1, Vector2>::type;
+template <int FirstHead, int ... FirstTail, int SecondHead, int ... SecondTail, typename AddedVector>
+struct add_impl<static_vector<FirstHead, FirstTail ...>, static_vector<SecondHead, SecondTail ...>, AddedVector>
+{
+    using type = typename add_impl<static_vector<FirstTail ...>, static_vector<SecondTail ...>, push_back_t<AddedVector, (FirstHead + SecondHead)>>::type;
+};
+
+template <typename FirstVector, typename SecondVector>
+struct add
+{
+    using type = typename add_impl<FirstVector, SecondVector, static_vector<>>::type;
+};
+
+template <typename FirstVector, typename SecondVector>
+using add_t = typename add<FirstVector, SecondVector>::type;
 
 // Subtract two vectors
-template <typename Vector1, typename Vector2>
-struct subtract
+template <typename FirstVector, typename SecondVector, typename SubtractedVector>
+struct subtract_impl
 {};
 
-template <int ... Values1, int ... Values2>
-struct subtract<static_vector<Values1 ...>, static_vector<Values2 ...>>
+template <int FirstHead, int SecondHead, typename AddedVector>
+struct subtract_impl<static_vector<FirstHead>, static_vector<SecondHead>, AddedVector>
 {
-    using type = static_vector<Values1 ..., Values2 ...>;
+    using type = push_back_t<AddedVector, (FirstHead - SecondHead)>;
 };
 
-template <typename Vector1, typename Vector2>
-using subtract_t = typename subtract<Vector1, Vector2>::type;
+template <int FirstHead, int ... FirstTail, int SecondHead, int ... SecondTail, typename SubtractedVector>
+struct subtract_impl<static_vector<FirstHead, FirstTail ...>, static_vector<SecondHead, SecondTail ...>, SubtractedVector>
+{
+    using type = typename subtract_impl<static_vector<FirstTail ...>, static_vector<SecondTail ...>, push_back_t<SubtractedVector, (FirstHead - SecondHead)>>::type;
+};
+
+template <typename FirstVector, typename SecondVector>
+struct subtract
+{
+    using type = typename subtract_impl<FirstVector, SecondVector, static_vector<>>::type;
+};
+
+template <typename FirstVector, typename SecondVector>
+using subtract_t = typename subtract<FirstVector, SecondVector>::type;
 
 #endif
